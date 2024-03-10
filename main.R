@@ -10,9 +10,26 @@ renv::restore()
 library(terra)
 library(lidR)
 
+isRStudio <- Sys.getenv("RSTUDIO") == "1"
+
+# If running in RStudio, set default values
+if (isRStudio) {
+  input_file <- "tree_upright.las"
+  output_file <- "output.las"
+} else {
+  # Check if command line arguments are provided
+  if (length(commandArgs(trailingOnly = TRUE)) < 2) {
+    stop("Usage: Rscript script.R input_file output_file")
+  }
+  
+  # Retrieve input and output file paths from command line arguments
+  input_file <- commandArgs(trailingOnly = TRUE)[1]
+  output_file <- commandArgs(trailingOnly = TRUE)[2]
+}
 
 
-las <- readLAS("tree_upright.las")
+
+las <- readLAS(input_file)
 las_check(las)
 
 las <- filter_duplicates(las)
@@ -39,4 +56,4 @@ las <- segment_trees(las = las, algorithm = dalponte2016(chm = chm, treetops = t
 length(unique(las$treeID) |> na.omit())
 
 
-writeLAS(las, "export.las")
+writeLAS(las, output_file)
