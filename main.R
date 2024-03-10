@@ -27,6 +27,9 @@ if (isRStudio) {
   output_file <- commandArgs(trailingOnly = TRUE)[2]
 }
 
+# print input and output file paths
+print(input_file)
+print(output_file)
 
 
 las <- readLAS(input_file)
