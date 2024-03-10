@@ -1,6 +1,11 @@
-library(terra)
+install.packages("renv")
+renv::restore()
 
+#renv::snapshot()
+
+library(terra)
 library(lidR)
+
 
 
 las <- readLAS("tree_upright.las")
