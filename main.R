@@ -1,8 +1,5 @@
-r = getOption("repos")
-r["CRAN"] = "http://cran.us.r-project.org"
-options(repos = r)
-
 install.packages("renv")
+
 renv::restore()
 
 
@@ -13,9 +10,13 @@ if (isRStudio) {
   input_file <- "tree_upright.las"
   output_file <- "output.las"
   
+  
+  renv::init()
+  
   renv::install("terra")
   renv::install("lidR")
   renv::install("RCSF")
+  renv::settings$snapshot.type("all")
   renv::snapshot()
   
 } else {
