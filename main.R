@@ -5,10 +5,6 @@ options(repos = r)
 install.packages("renv")
 renv::restore()
 
-#renv::snapshot()
-
-library(terra)
-library(lidR)
 
 isRStudio <- Sys.getenv("RSTUDIO") == "1"
 
@@ -16,6 +12,12 @@ isRStudio <- Sys.getenv("RSTUDIO") == "1"
 if (isRStudio) {
   input_file <- "tree_upright.las"
   output_file <- "output.las"
+  
+  renv::install("terra")
+  renv::install("lidR")
+  renv::install("RCSF")
+  renv::snapshot()
+  
 } else {
   # Check if command line arguments are provided
   if (length(commandArgs(trailingOnly = TRUE)) < 2) {
@@ -26,6 +28,9 @@ if (isRStudio) {
   input_file <- commandArgs(trailingOnly = TRUE)[1]
   output_file <- commandArgs(trailingOnly = TRUE)[2]
 }
+
+library(terra)
+library(lidR)
 
 # print input and output file paths
 print(input_file)
