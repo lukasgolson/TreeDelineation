@@ -16,6 +16,7 @@ if (isRStudio) {
   renv::install("terra")
   renv::install("lidR")
   renv::install("RCSF")
+  renv::install("future")
   renv::settings$snapshot.type("all")
   renv::snapshot()
   
