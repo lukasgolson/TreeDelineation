@@ -67,3 +67,5 @@ length(unique(las$treeID) |> na.omit())
 
 
 writeLAS(las, output_file)
+
+print("Finished!")
