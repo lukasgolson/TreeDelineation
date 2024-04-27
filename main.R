@@ -1,71 +1,66 @@
-install.packages("renv")
-
-renv::restore()
-
-
-isRStudio <- Sys.getenv("RSTUDIO") == "1"
-
-# If running in RStudio, set default values
-if (isRStudio) {
-  input_file <- "tree_upright.las"
-  output_file <- "output.las"
-  
-  
-  renv::init()
-  
-  renv::install("terra")
-  renv::install("lidR")
-  renv::install("RCSF")
-  renv::install("future")
-  renv::settings$snapshot.type("all")
-  renv::snapshot()
-  
-} else {
-  # Check if command line arguments are provided
-  if (length(commandArgs(trailingOnly = TRUE)) < 2) {
-    stop("Usage: Rscript script.R input_file output_file")
+# Ensure required packages are installed and loaded
+ensure_packages <- function(packages) {
+  missing_packages <- packages[!(packages %in% installed.packages()[,"Package"])]
+  if (length(missing_packages)) {
+    install.packages(missing_packages)
   }
-  
-  # Retrieve input and output file paths from command line arguments
-  input_file <- commandArgs(trailingOnly = TRUE)[1]
-  output_file <- commandArgs(trailingOnly = TRUE)[2]
+
+  lapply(packages, function(pkg) {
+    if (!require(pkg, character.only = TRUE, quietly = FALSE)) {
+      stop(sprintf("Package '%s' failed to load. Please check installation.", pkg))
+    }
+  })
 }
 
-library(terra)
-library(lidR)
+# Configure script parameters based on execution environment
+configure_paths <- function() {
+  if (Sys.getenv("RSTUDIO") == "1") {
+    return(list(input = "tree_upright.las", output = "output.las"))
+  } else {
+    args <- commandArgs(trailingOnly = TRUE)
+    if (length(args) < 2) stop("Usage: Rscript script.R input_file output_file", call. = FALSE)
+    return(list(input = args[1], output = args[2]))
+  }
+}
 
-# print input and output file paths
-print(input_file)
-print(output_file)
+# Process LAS files with various lidR and terra functions
+process_las <- function(input_file, output_file) {
+  las <- lidR::readLAS(input_file)
+  if (is.null(las)) stop("Error reading LAS file: ", input_file, call. = FALSE)
 
+  las %>%
+    lidR::filter_duplicates() %>%
+    lidR::decimate_points(lidR::random(1000)) %>%
+    lidR::classify_ground(algorithm = lidR::csf()) %>%
+    lidR::segment_trees(algorithm = lidR::dalponte2016(chm = compute_chm(las), treetops = locate_treetops(compute_chm(las)))) %>%
+    {if (!lidR::writeLAS(., output_file)) stop("Failed to write LAS file: ", output_file, call. = FALSE)}
 
-las <- readLAS(input_file)
-las_check(las)
+  message("Processing complete for: ", output_file)
+}
 
-las <- filter_duplicates(las)
+# Compute Canopy Height Model (CHM)
+compute_chm <- function(las) {
+  dtm <- lidR::grid_terrain(las, algorithm = lidR::tin())
+  chm <- lidR::grid_canopy(las, 0.5, lidR::p2r())
+  return(chm)
+}
 
-las <- decimate_points(las, random(1000))
+# Locate treetops using local maximum filter
+locate_treetops <- function(chm) {
+  ttops <- lidR::find_trees(chm, algorithm = lidR::lmf(ws = 5))
+  return(ttops)
+}
 
-las <- classify_ground(las, algorithm = csf())
+# Main function to orchestrate the workflow
+main <- function() {
+  required_packages <- c("terra", "lidR", "RCSF", "future", "magrittr")
+  ensure_packages(required_packages)
+  
+  paths <- configure_paths()
+  process_las(paths$input, paths$output)
+}
 
-dtm_tin <- rasterize_terrain(las, res = 1, algorithm = tin())
-
-chm <- rasterize_canopy(las, res = 1, algorithm = p2r())
-
-f <- function(x) {x * 0.1 + 3}
-heights <- seq(0,30,5)
-ws <- f(heights)
-
-
-ttops <- locate_trees(chm, algorithm = lmf(ws = 2.5))
-
-
-las <- segment_trees(las = las, algorithm = dalponte2016(chm = chm, treetops = ttops))
-
-
-length(unique(las$treeID) |> na.omit())
-
-
-writeLAS(las, output_file)
-
-print("Finished!")
+# Execute main function if not sourced from another script
+if (!interactive() && !knitr::is_html_output()) {
+  main()
+}
