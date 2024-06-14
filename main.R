@@ -1,15 +1,15 @@
 # Ensure required packages are installed and loaded
 ensure_packages <- function(packages) {
-  missing_packages <- packages[!(packages %in% installed.packages()[,"Package"])]
+  missing_packages <- packages[!(packages %in% installed.packages()[, "Package"])]
   if (length(missing_packages)) {
     install.packages(missing_packages)
   }
 
-  lapply(packages, function(pkg) {
-    if (!require(pkg, character.only = TRUE, quietly = FALSE)) {
+  invisible(lapply(packages, function(pkg) {
+    if (!require(pkg, character.only = TRUE)) {
       stop(sprintf("Package '%s' failed to load. Please check installation.", pkg))
     }
-  })
+  }))
 }
 
 # Configure script parameters based on execution environment
@@ -24,19 +24,37 @@ configure_paths <- function() {
 }
 
 # Process LAS files with various lidR and terra functions
+# Process LAS files with various lidR functions
 process_las <- function(input_file, output_file) {
   las <- lidR::readLAS(input_file)
   if (is.null(las)) stop("Error reading LAS file: ", input_file, call. = FALSE)
 
-  las %>%
-    lidR::filter_duplicates() %>%
-    lidR::decimate_points(lidR::random(1000)) %>%
-    lidR::classify_ground(algorithm = lidR::csf()) %>%
-    lidR::segment_trees(algorithm = lidR::dalponte2016(chm = compute_chm(las), treetops = locate_treetops(compute_chm(las)))) %>%
-    {if (!lidR::writeLAS(., output_file)) stop("Failed to write LAS file: ", output_file, call. = FALSE)}
+  # Filter duplicate points
+  las <- lidR::filter_duplicates(las)
+
+  # Decimate points to a fixed number
+  las <- lidR::decimate_points(las, lidR::random(1000))
+
+  # Classify ground points using the CSF algorithm
+  las <- lidR::classify_ground(las, algorithm = lidR::csf(cloth_resolution = 0.25, class_threshold=0.1))
+
+  # Compute Canopy Height Model (CHM)
+  chm <- compute_chm(las)
+
+  # Locate treetops in the CHM
+  treetops <- locate_treetops(chm)
+
+  # Segment trees using Dalponte2016 algorithm
+  las <- lidR::segment_trees(las, algorithm = lidR::dalponte2016(chm = chm, treetops = treetops))
+
+  # Write the processed LAS file
+  if (!lidR::writeLAS(las, output_file)) {
+    stop("Failed to write LAS file: ", output_file, call. = FALSE)
+  }
 
   message("Processing complete for: ", output_file)
 }
+
 
 # Compute Canopy Height Model (CHM)
 compute_chm <- function(las) {
@@ -53,7 +71,7 @@ locate_treetops <- function(chm) {
 
 # Main function to orchestrate the workflow
 main <- function() {
-  required_packages <- c("terra", "lidR", "RCSF", "future", "magrittr")
+  required_packages <- c("terra", "lidR", "RCSF", "future", "magrittr", "sp", "raster")
   ensure_packages(required_packages)
   
   paths <- configure_paths()
