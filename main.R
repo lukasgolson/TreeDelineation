@@ -61,6 +61,6 @@ main <- function() {
 }
 
 # Execute main function if not sourced from another script
-if (!interactive() && !knitr::is_html_output()) {
+if (!interactive()) {
   main()
 }
