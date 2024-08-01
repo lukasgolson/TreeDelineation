@@ -4,7 +4,7 @@ ensure_packages <- function(packages) {
   if (length(missing_packages)) {
     install.packages(missing_packages)
   }
-
+  
   invisible(lapply(packages, function(pkg) {
     if (!require(pkg, character.only = TRUE)) {
       stop(sprintf("Package '%s' failed to load. Please check installation.", pkg))
@@ -23,38 +23,34 @@ configure_paths <- function() {
   }
 }
 
-# Process LAS files with various lidR and terra functions
 # Process LAS files with various lidR functions
 process_las <- function(input_file, output_file) {
   las <- lidR::readLAS(input_file)
   if (is.null(las)) stop("Error reading LAS file: ", input_file, call. = FALSE)
-
+  
   # Filter duplicate points
   las <- lidR::filter_duplicates(las)
-
+  
   # Decimate points to a fixed number
-  las <- lidR::decimate_points(las, lidR::random(1000))
-
+  las <- lidR::decimate_points(las, lidR::homogenize(250, res = 5, use_pulse = FALSE))
+  
   # Classify ground points using the CSF algorithm
-  las <- lidR::classify_ground(las, algorithm = lidR::csf(cloth_resolution = 0.25, class_threshold=0.1))
-
+  las <- lidR::classify_ground(las, algorithm = lidR::csf(cloth_resolution = 0.25, class_threshold = 0.1))
+  
   # Compute Canopy Height Model (CHM)
   chm <- compute_chm(las)
-
+  
   # Locate treetops in the CHM
   treetops <- locate_treetops(chm)
-
+  
   # Segment trees using Dalponte2016 algorithm
   las <- lidR::segment_trees(las, algorithm = lidR::dalponte2016(chm = chm, treetops = treetops))
-
+  
   # Write the processed LAS file
-  if (!lidR::writeLAS(las, output_file)) {
-    stop("Failed to write LAS file: ", output_file, call. = FALSE)
-  }
-
+  lidR::writeLAS(las, output_file, index = FALSE)
+  
   message("Processing complete for: ", output_file)
 }
-
 
 # Compute Canopy Height Model (CHM)
 compute_chm <- function(las) {
@@ -75,6 +71,8 @@ main <- function() {
   ensure_packages(required_packages)
   
   paths <- configure_paths()
+  print(sprintf("Input file: %s", paths$input))
+  print(sprintf("Output file: %s", paths$output))
   process_las(paths$input, paths$output)
 }
 
