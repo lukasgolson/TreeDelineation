@@ -28,28 +28,21 @@ process_las <- function(input_file, output_file) {
   las <- lidR::readLAS(input_file)
   if (is.null(las)) stop("Error reading LAS file: ", input_file, call. = FALSE)
 
-  # Filter duplicate points
   las <- lidR::filter_duplicates(las)
 
-  # Classify ground points using the CSF algorithm
   las <- lidR::classify_ground(las, algorithm = lidR::csf(cloth_resolution = 0.25, class_threshold = 0.1))
 
-  # Compute the Digital Terrain Model (DTM)
   dtm <- lidR::grid_terrain(las, algorithm = lidR::tin())
 
-  # Normalize the point cloud to the ground (subtract ground elevation from point elevation)
   las <- lidR::normalize_height(las, dtm)
 
-  # Remove points that are below ground after normalization (optional but common)
+
   las <- lidR::filter_poi(las, Z >= 0)
 
-  # Compute Canopy Height Model (CHM)
   chm <- compute_chm(las)
 
-  # Locate treetops in the CHM
   treetops <- locate_treetops(chm)
 
-  # Segment trees using Dalponte2016 algorithm
   las <- lidR::segment_trees(las, algorithm = lidR::dalponte2016(chm = chm, treetops = treetops))
 
   # Write the processed LAS file
